@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0f9d58" />
+<title>排便记录 · NFC 贴片打卡</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#ffffff; --ink:#1f2933; --sub:#6b7785;
+    --line:#e3e8ee; --brand:#0f9d58; --brand-d:#0b8043;
+    --warn:#e65100; --danger:#d32f2f; --chip:#e8f5ee; --accent:#2979ff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink); font-size:15px; line-height:1.5;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:14px 14px 96px;}
+  h1{font-size:20px;margin:4px 0 2px;}
+  .tagline{color:var(--sub);font-size:13px;margin:0 0 12px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+  .card h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .status{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--chip);color:var(--brand-d);font-weight:600;}
+  .status.off{background:#fdecea;color:var(--danger);}
+  .status.warn{background:#fff3e0;color:var(--warn);}
+  button{font-family:inherit;font-size:15px;border:none;border-radius:11px;padding:12px 16px;cursor:pointer;font-weight:600;transition:transform .05s,filter .15s;}
+  button:active{transform:scale(.98);}
+  .btn-brand{background:var(--brand);color:#fff;width:100%;}
+  .btn-brand.stop{background:var(--danger);}
+  .btn-ghost{background:#eef1f4;color:var(--ink);}
+  .btn-line{background:#fff;color:var(--brand-d);border:1.5px solid var(--brand);}
+  .btn-sm{padding:8px 12px;font-size:13px;font-weight:600;}
+  .btn-danger{background:#fdecea;color:var(--danger);}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  .row>*{flex:1;min-width:0;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .stat{background:#f7f9fb;border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center;}
+  .stat .n{font-size:22px;font-weight:700;}
+  .stat .l{font-size:12px;color:var(--sub);}
+  .muted{color:var(--sub);font-size:12px;}
+  input[type=text]{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;}
+  input[type=text]:focus{outline:none;border-color:var(--brand);}
+  .tabs{display:flex;background:#eef1f4;border-radius:11px;padding:4px;gap:4px;}
+  .tabs button{flex:1;background:transparent;color:var(--sub);padding:9px 0;border-radius:8px;font-weight:600;font-size:14px;}
+  .tabs button.active{background:#fff;color:var(--brand-d);box-shadow:0 1px 2px rgba(0,0,0,.06);}
+  .tagItem{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .tagItem:last-child{border-bottom:none;}
+  .tagDot{width:30px;height:30px;border-radius:8px;background:var(--chip);color:var(--brand-d);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;}
+  .tagItem .meta{flex:1;min-width:0;}
+  .tagItem .meta .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tagItem .meta .id{font-size:11px;color:var(--sub);font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .recItem{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .recItem:last-child{border-bottom:none;}
+  .recItem .t{font-variant-numeric:tabular-nums;font-weight:600;min-width:64px;}
+  .recItem .who{flex:1;}
+  .recItem .del{color:var(--danger);background:none;font-size:13px;padding:6px 8px;}
+  .chart{width:100%;height:auto;display:block;}
+  .chart-title{font-size:13px;color:var(--sub);margin:0 0 6px;font-weight:600;}
+  details{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 14px;margin-bottom:14px;}
+  details summary{cursor:pointer;font-weight:600;padding:8px 0;list-style:none;}
+  details summary::-webkit-details-marker{display:none;}
+  details summary:before{content:"▸ ";color:var(--brand);}
+  details[open] summary:before{content:"▾ ";}
+  details ol,details ul{margin:6px 0 10px;padding-left:20px;font-size:13px;color:var(--ink);}
+  details li{margin:5px 0;}
+  details code{background:#eef1f4;padding:1px 5px;border-radius:5px;font-size:12px;}
+  /* toast */
+  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:50;display:flex;flex-direction:column;gap:8px;width:calc(100% - 28px);max-width:560px;pointer-events:none;}
+  .toast{background:#1f2933;color:#fff;padding:12px 14px;border-radius:12px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:rise .25s ease;pointer-events:auto;}
+  .toast .msg{flex:1;font-size:14px;}
+  .toast .ok{color:#7CFFB2;font-weight:700;}
+  .toast .undo{background:rgba(255,255,255,.16);color:#fff;padding:7px 12px;font-size:13px;border-radius:9px;font-weight:700;}
+  @keyframes rise{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+  .hint{background:#fff8e1;border:1px solid #ffe082;color:#7a5b00;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:14px;}
+  .switch{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sub);margin-top:10px;}
+  .flash{transition:background .1s;}
+  .flash.on{background:#e8f5ee;}
+  .sec-title{font-size:13px;color:var(--sub);font-weight:700;margin:14px 0 8px;text-transform:uppercase;letter-spacing:.04em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🚽 排便记录 · NFC 打卡</h1>
+  <p class="tagline">手机碰一下贴片，自动记一条 · 数据本地保存，断电不丢</p>
+
+  <div id="envHint"></div>
+
+  <!-- 打卡区 -->
+  <div class="card flash" id="scanCard">
+    <h2>快速打卡
+      <span class="status off" id="scanStatus">NFC 未启用</span>
+    </h2>
+    <button class="btn-brand" id="scanBtn">开始监听 NFC</button>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn-ghost" id="manualBtn">手动记一次</button>
+      <button class="btn-ghost" id="undoBtn">撤销最近一条</button>
+    </div>
+    <div class="switch">
+      <label><input type="checkbox" id="soundChk" checked /> 打卡提示音</label>
+    </div>
+  </div>
+
+  <!-- 贴片管理 -->
+  <div class="card">
+    <h2>贴片管理</h2>
+    <div class="row" style="margin-bottom:10px;">
+      <input type="text" id="tagNameInput" placeholder="给贴片起个名，如「爸爸」「宝宝」" />
+      <button class="btn-line btn-sm" id="addTagBtn" style="flex:0 0 auto;">添加</button>
+    </div>
+    <p class="muted" id="bindHint" style="display:none;margin:0 0 8px;">已命名「<b id="bindName"></b>」——现在用手机碰一下这张贴片完成绑定。</p>
+    <div id="tagList"></div>
+    <p class="muted" id="tagEmpty" style="margin:6px 0 0;">还没有贴片。先填名字点「添加」，再碰一下贴片即可绑定；空白 NTAG 贴片可直接用硬件 UID 识别，无需预写内容。</p>
+  </div>
+
+  <!-- 统计与可视化 -->
+  <div class="card">
+    <h2>统计与可视化</h2>
+    <div class="tabs" id="viewTabs">
+      <button data-v="day" class="active">按日</button>
+      <button data-v="week">按周</button>
+      <button data-v="month">按月</button>
+    </div>
+    <div class="grid2" style="margin-top:12px;" id="summaryBox"></div>
+    <p class="chart-title" id="trendTitle" style="margin-top:14px;"></p>
+    <svg class="chart" id="trendChart" viewBox="0 0 680 200" preserveAspectRatio="none"></svg>
+    <p class="chart-title" style="margin-top:14px;">一天中常见时段分布（24 小时）</p>
+    <svg class="chart" id="hourChart" viewBox="0 0 680 200" preserveAspectRatio="none"></svg>
+  </div>
+
+  <!-- 记录列表 -->
+  <div class="card">
+    <h2>记录列表 <span class="muted" id="listCount"></span></h2>
+    <div id="recList"></div>
+  </div>
+
+  <!-- 导出 -->
+  <div class="card">
+    <h2>导出 / 数据</h2>
+    <div class="row">
+      <button class="btn-ghost" id="csvBtn">导出 CSV</button>
+      <button class="btn-ghost" id="jsonBtn">导出 JSON</button>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn-danger btn-sm" id="clearBtn">清空全部记录</button>
+    </div>
+  </div>
+
+  <!-- 使用说明 -->
+  <details>
+    <summary>手机端读取 NFC 的使用前提与操作步骤</summary>
+    <p class="muted" style="margin-top:0;">本工具基于浏览器 <b>Web NFC（NDEFReader）</b>接口实现。先看清前提，否则碰贴片不会有反应。</p>
+    <p class="chart-title">一、使用前提（缺一不可）</p>
+    <ol>
+      <li><b>安卓手机</b>：需 Android 5.0+ 且带 NFC 芯片，浏览器用 <b>Chrome / Edge / Samsung Internet</b>（同为 Chromium 内核）。<br><span class="muted">iPhone / iPad 的任何浏览器（含 Chrome、Edge）目前<b>都不支持</b> Web NFC；iOS 只能在原生 App 里读 NFC。苹果用户请用本工具的「手动记一次」模式。</span></li>
+      <li><b>HTTPS 安全环境</b>：页面必须运行在 <code>https://</code> 或 <code>localhost</code> 下。用 <code>file://</code> 直接双击打开，或普通 <code>http://</code> 局域网地址，NFC 会被浏览器安全策略拦截。<br><span class="muted">最简方案：把本文件托管到免费静态空间（GitHub Pages / Netlify / Vercel / Cloudflare Pages），用手机访问其 https 链接即可。</span></li>
+      <li><b>手机开启 NFC</b>：系统设置里打开 NFC 开关（部分机型在「连接与共享」中）。</li>
+      <li><b>用户手势 + 授权</b>：浏览器规定扫描必须由一次点击触发，且首次使用会弹窗请求 NFC 权限，需点「允许」。</li>
+    </ol>
+    <p class="chart-title">二、操作步骤</p>
+    <ol>
+      <li>把本文件部署到 HTTPS 地址（见上），用手机浏览器打开。</li>
+      <li>点页面上的<b>「开始监听 NFC」</b>（这一步就是必需的「用户手势」），在权限弹窗点允许。</li>
+      <li>把手机背面上半部分（NFC 天线通常在摄像头附近）贴近 NTAG 贴片，约 0.5 秒即自动写入一条记录，并弹出成功提示。</li>
+      <li>贴片区分使用者：先在「贴片管理」填名字点添加 → 碰一下贴片完成绑定；之后该贴片每次打卡都归到这个名字下。</li>
+    </ol>
+    <p class="chart-title">三、贴片选购与写入</p>
+    <ul>
+      <li>买 <b>NTAG213 / NTAG215</b> 空白不干胶贴片（淘宝约 ¥1–2/张，整卷更便宜），无需预写内容——本工具直接读取贴片硬件 UID 来识别身份。</li>
+      <li>若你希望贴片里存可读文本（如 <code>user:dad</code>），可用「NFC Tools」等 App 写入一条 <b>Text</b> 记录，本工具会优先用文本内容识别。</li>
+      <li>同一张贴片 3 秒内重复碰，会被判为误触而忽略，避免重复记。</li>
+    </ul>
+    <p class="chart-title">四、本地测试（无手机 / 无贴片也能跑）</p>
+    <ul>
+      <li>桌面浏览器打开本文件：NFC 不可用时会自动显示提示，可用「手动记一次」体验完整流程，数据同样本地保存。</li>
+      <li>想在电脑上真读 NFC，需要外接 USB 读卡器 + 原生程序（Web NFC 不认外接读卡器），本工具未覆盖该场景。</li>
+      <li>临时用手机测本地页面：在本机运行 <code>python -m http.server</code> 后用 <code>ngrok</code> / <code>localtunnel</code> 等把 localhost 映射成 https 链接，再在手机打开。</li>
+    </ul>
+  </details>
+
+  <p class="muted" style="text-align:center;">数据仅保存在本机浏览器（localStorage），不会上传任何服务器。</p>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- 存储 ----------
+  var REC_KEY = "poop_records_v1";
+  var TAG_KEY = "poop_tags_v1";
+
+  function loadRecords(){
+    try{ return JSON.parse(localStorage.getItem(REC_KEY)) || []; }catch(e){ return []; }
+  }
+  function saveRecords(arr){ localStorage.setItem(REC_KEY, JSON.stringify(arr)); }
+  function loadTags(){
+    try{ return JSON.parse(localStorage.getItem(TAG_KEY)) || []; }catch(e){ return []; }
+  }
+  function saveTags(arr){ localStorage.setItem(TAG_KEY, JSON.stringify(arr)); }
+
+  var records = loadRecords();
+  var tags = loadTags();
+  var lastRecordId = null;
+  var lastTap = { id:null, ts:0 };
+  var DEBOUNCE_MS = 3000;
+
+  // ---------- 工具 ----------
+  function pad(n){ return (n<10?"0":"")+n; }
+  function dts(ts){ var d=new Date(ts); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function dtime(ts){ var d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds()); }
+  function dayKey(ts){ return dts(ts); }
+  function tagName(id){ var t=findTag(id); return t? t.name : (id||"未命名"); }
+  function findTag(id){ for(var i=0;i<tags.length;i++){ if(tags[i].id===id) return tags[i]; } return null; }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+  // ---------- DOM ----------
+  var $ = function(id){ return document.getElementById(id); };
+  var scanBtn=$("scanBtn"), scanStatus=$("scanStatus"), manualBtn=$("manualBtn"), undoBtn=$("undoBtn");
+  var tagNameInput=$("tagNameInput"), addTagBtn=$("addTagBtn"), tagList=$("tagList"), tagEmpty=$("tagEmpty");
+  var bindHint=$("bindHint"), bindName=$("bindName");
+  var viewTabs=$("viewTabs"), summaryBox=$("summaryBox"), trendTitle=$("trendTitle");
+  var trendChart=$("trendChart"), hourChart=$("hourChart");
+  var recList=$("recList"), listCount=$("listCount");
+  var csvBtn=$("csvBtn"), jsonBtn=$("jsonBtn"), clearBtn=$("clearBtn");
+  var envHint=$("envHint"), soundChk=$("soundChk"), scanCard=$("scanCard");
+
+  var currentView = "day";
+  var pendingBindName = null;
+
+  // ---------- NFC ----------
+  var ndef = null, scanning = false;
+  var nfcSupported = ("NDEFReader" in window);
+  var secureCtx = (window.isSecureContext === true);
+
+  function renderEnvHint(){
+    if(nfcSupported && secureCtx){
+      envHint.innerHTML = "";
+      return;
+    }
+    var msg = "";
+    if(!nfcSupported){
+      msg = "当前浏览器不支持 Web NFC（需 Android + Chrome/Edge 等 Chromium 内核浏览器）。已启用「手动记一次」模式，功能与数据保存完全一致。";
+    } else if(!secureCtx){
+      msg = "当前页面不是安全环境（需 https:// 或 localhost），NFC 会被浏览器拦截。可用「手动记一次」模式；真机刷卡请改用 https 地址打开。";
+    }
+    envHint.innerHTML = '<div class="hint">⚠️ '+msg+'</div>';
+  }
+
+  function setStatus(text, cls){
+    scanStatus.textContent = text;
+    scanStatus.className = "status" + (cls? " "+cls : "");
+  }
+
+  async function startScan(){
+    if(!nfcSupported){ toast("此环境不支持 NFC，请用「手动记一次」", false); return; }
+    if(scanning){ stopScan(); return; }
+    try{
+      ndef = new NDEFReader();
+      await ndef.scan();
+      scanning = true;
+      ndef.onreading = onReading;
+      ndef.onreadingerror = function(){ toast("读卡失败，换个角度再碰一下", false); };
+      scanBtn.textContent = "停止监听";
+      scanBtn.classList.add("stop");
+      setStatus("监听中…", null);
+      toast("已开启 NFC 监听，碰贴片即可记录", false);
+    }catch(err){
+      var reason = (err && err.name==="NotAllowedError") ? "权限被拒绝，请在浏览器允许 NFC" :
+                   (err && err.name==="SecurityError") ? "需在 https 或 localhost 下使用" :
+                   ("无法启动：" + (err && err.message ? err.message : err));
+      toast(reason, false);
+      setStatus("NFC 未启用","off");
+    }
+  }
+  function stopScan(){
+    scanning = false;
+    if(ndef && ndef.onreading){ try{ /* Chromium 当前无 abort；保留引用即可 */ }catch(e){} }
+    ndef = null;
+    scanBtn.textContent = "开始监听 NFC";
+    scanBtn.classList.remove("stop");
+    setStatus("NFC 未启用","off");
+  }
+
+  function onReading(event){
+    var id = readIdentity(event);
+    if(!id){ toast("读到空标签，忽略", false); return; }
+    // 绑定模式
+    if(pendingBindName){
+      var existing = findTag(id);
+      if(existing){ existing.name = pendingBindName; }
+      else { tags.push({ id:id, name:pendingBindName, createdAt:Date.now() }); }
+      saveTags(tags);
+      var done = pendingBindName;
+      pendingBindName = null;
+      bindHint.style.display = "none";
+      toast("贴片「"+done+"」绑定成功 ✅", false);
+      renderTags();
+      return;
+    }
+    handleTap(id);
+  }
+
+  function readIdentity(event){
+    // 优先 NDEF 文本/URL 内容
+    try{
+      var msg = event.message;
+      if(msg && msg.records){
+        for(var i=0;i<msg.records.length;i++){
+          var r = msg.records[i];
+          if(r.recordType==="text" || r.recordType==="url"){
+            var txt = (typeof r.data === "string") ? r.data : new TextDecoder().decode(r.data);
+            txt = (txt||"").trim();
+            if(txt) return txt;
+          }
+        }
+      }
+    }catch(e){}
+    // 退回硬件 UID
+    if(event.serialNumber){ return ("UID:" + event.serialNumber).toUpperCase(); }
+    return null;
+  }
+
+  // ---------- 打卡核心 ----------
+  function handleTap(id){
+    var now = Date.now();
+    if(lastTap.id===id && (now - lastTap.ts) < DEBOUNCE_MS){
+      toast("已忽略 "+tagName(id)+" 的重复刷卡（"+Math.round((DEBOUNCE_MS-(now-lastTap.ts))/1000)+"s 内）", false);
+      return;
+    }
+    lastTap = { id:id, ts:now };
+    addRecord(id);
+  }
+
+  function addRecord(id){
+    var rec = { id:uid(), ts:Date.now(), tagId:id, tagName:tagName(id) };
+    records.push(rec);
+    saveRecords(records);
+    lastRecordId = rec.id;
+    beep();
+    scanCard.classList.add("on");
+    setTimeout(function(){ scanCard.classList.remove("on"); }, 180);
+    toast("已记录 ✅ "+rec.tagName+" · "+dtime(rec.ts), true, rec.id);
+    refreshAll();
+  }
+
+  function beep(){
+    if(!soundChk.checked) return;
+    try{
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      var ctx = new AC();
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type="sine"; o.frequency.value=880;
+      g.gain.setValueAtTime(0.001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.18);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime+0.2);
+      setTimeout(function(){ try{ctx.close();}catch(e){} }, 260);
+    }catch(e){}
+  }
+
+  function undoLast(){
+    if(!lastRecordId) { toast("没有可撤销的记录", false); return; }
+    var idx = -1;
+    for(var i=0;i<records.length;i++){ if(records[i].id===lastRecordId){ idx=i; break; } }
+    if(idx<0){ toast("该记录已不存在", false); lastRecordId=null; return; }
+    var removed = records.splice(idx,1)[0];
+    saveRecords(records);
+    lastRecordId = null;
+    toast("已撤销："+removed.tagName+" "+dtime(removed.ts), false);
+    refreshAll();
+  }
+
+  function deleteRecord(id){
+    records = records.filter(function(r){ return r.id!==id; });
+    saveRecords(records);
+    if(lastRecordId===id) lastRecordId=null;
+    refreshAll();
+  }
+
+  // ---------- 贴片管理 ----------
+  function addTag(){
+    var name = (tagNameInput.value||"").trim();
+    if(!name){ toast("请先填贴片名字", false); return; }
+    pendingBindName = name;
+    bindName.textContent = name;
+    bindHint.style.display = "block";
+    tagNameInput.value = "";
+    if(nfcSupported && secureCtx && !scanning){
+      toast("请先点「开始监听 NFC」再碰贴片绑定", false);
+    } else if(!nfcSupported || !secureCtx){
+      toast("NFC 不可用：可在支持的手机上绑定，或先手动记录后再改名归类", false);
+    } else {
+      toast("现在碰一下要绑定的贴片", false);
+    }
+  }
+
+  function renderTags(){
+    tagList.innerHTML = "";
+    if(tags.length===0){ tagEmpty.style.display="block"; return; }
+    tagEmpty.style.display="none";
+    var counts = {};
+    records.forEach(function(r){ counts[r.tagId]=(counts[r.tagId]||0)+1; });
+    tags.forEach(function(t){
+      var div = document.createElement("div"); div.className="tagItem";
+      var dot = document.createElement("div"); dot.className="tagDot"; dot.textContent = t.name.slice(0,1);
+      var meta = document.createElement("div"); meta.className="meta";
+      var nm = document.createElement("div"); nm.className="nm"; nm.textContent = t.name;
+      var id = document.createElement("div"); id.className="id"; id.textContent = (t.id||"").slice(0,24);
+      meta.appendChild(nm); meta.appendChild(id);
+      var cnt = document.createElement("div"); cnt.className="muted"; cnt.style.minWidth="42px"; cnt.style.textAlign="right";
+      cnt.textContent = (counts[t.id]||0)+" 次";
+      var ren = document.createElement("button"); ren.className="btn-ghost btn-sm"; ren.textContent="改名";
+      ren.onclick = function(){ var nn=prompt("修改贴片名称", t.name); if(nn&&nn.trim()){ t.name=nn.trim(); saveTags(tags); refreshAll(); } };
+      var del = document.createElement("button"); del.className="btn-danger btn-sm"; del.textContent="删除";
+      del.onclick = function(){
+        if(confirm("删除贴片「"+t.name+"」？其历史记录仍保留（标记为未命名）。")){
+          tags = tags.filter(function(x){ return x.id!==t.id; }); saveTags(tags); refreshAll();
+        }
+      };
+      div.appendChild(dot); div.appendChild(meta); div.appendChild(cnt); div.appendChild(ren); div.appendChild(del);
+      tagList.appendChild(div);
+    });
+  }
+
+  // ---------- 视图与统计 ----------
+  function recordsInView(){
+    var now = new Date();
+    if(currentView==="day"){
+      var k = dayKey(now.getTime());
+      return records.filter(function(r){ return dayKey(r.ts)===k; });
+    }
+    if(currentView==="week"){
+      var start = new Date(now); start.setHours(0,0,0,0); start.setDate(start.getDate()-6);
+      return records.filter(function(r){ return r.ts >= start.getTime(); });
+    }
+    // month: 近30天
+    var s2 = new Date(now); s2.setHours(0,0,0,0); s2.setDate(s2.getDate()-29);
+    return records.filter(function(r){ return r.ts >= s2.getTime(); });
+  }
+
+  function buildDaySeries(){
+    // 近 N 天，按日聚合
+    var n = (currentView==="day")?1 : (currentView==="week")?7 : 30;
+    var arr=[], now=new Date(); now.setHours(0,0,0,0);
+    for(var i=n-1;i>=0;i--){
+      var d=new Date(now); d.setDate(d.getDate()-i);
+      var key=dayKey(d.getTime());
+      var cnt=0; records.forEach(function(r){ if(dayKey(r.ts)===key) cnt++; });
+      arr.push({ label:(n>1? (pad(d.getMonth()+1)+"/"+pad(d.getDate())) : "今日"), value:cnt });
+    }
+    return arr;
+  }
+
+  function buildHourSeries(list){
+    var arr=new Array(24).fill(0);
+    list.forEach(function(r){ arr[new Date(r.ts).getHours()]++; });
+    return arr.map(function(v,h){ return { label:pad(h), value:v }; });
+  }
+
+  function renderSummary(list){
+    var total = list.length;
+    var byTag={}; list.forEach(function(r){ byTag[r.tagId]=(byTag[r.tagId]||0)+1; });
+    var topName="—", topN=0;
+    Object.keys(byTag).forEach(function(k){ if(byTag[k]>topN){ topN=byTag[k]; topName=tagName(k); } });
+    // 最常见时段
+    var hr=new Array(24).fill(0); list.forEach(function(r){ hr[new Date(r.ts).getHours()]++; });
+    var peak=0, peakH=0; hr.forEach(function(v,h){ if(v>peak){peak=v;peakH=h;} });
+    var period = peak? periodName(peakH)+"（"+pad(peakH)+"点）" : "—";
+    var avg = (currentView==="day")? total : Math.round(total/ ( (currentView==="week")?7:30 )*10)/10;
+    summaryBox.innerHTML =
+      stat(total, "总次数") +
+      stat((currentView==="day"? "今日" : (currentView==="week"? "日均" : "日均")), "") +
+      stat(topName, "最多使用者") +
+      stat(period, "常见时段");
+    // 把“日均”数值补上
+    var nodes = summaryBox.querySelectorAll(".stat");
+    if(nodes[1]) nodes[1].querySelector(".n").textContent = avg;
+  }
+  function stat(n,l){ return '<div class="stat"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>'; }
+  function periodName(h){
+    if(h<6) return "凌晨"; if(h<12) return "上午"; if(h<18) return "下午"; return "晚上";
+  }
+
+  function barChart(svg, data, opts){
+    opts = opts || {};
+    var W=680, H=200, padL=8, padR=8, padT=14, padB=22;
+    var n=data.length; if(n===0){ svg.innerHTML='<text x="340" y="100" text-anchor="middle" fill="#9aa5b1" font-size="14">暂无数据</text>'; return; }
+    var max=0; data.forEach(function(d){ if(d.value>max) max=d.value; });
+    max = max || 1;
+    var plotW = W-padL-padR, plotH = H-padT-padB;
+    var bw = plotW/n;
+    var color = opts.color || "#0f9d58";
+    var svgParts = [];
+    // 基线
+    svgParts.push('<line x1="'+padL+'" y1="'+(padT+plotH)+'" x2="'+(W-padR)+'" y2="'+(padT+plotH)+'" stroke="#e3e8ee" stroke-width="1"/>');
+    for(var i=0;i<n;i++){
+      var v=data[i].value;
+      var bh = Math.round(v/max*plotH);
+      if(v>0 && bh<2) bh=2;
+      var x = padL + i*bw;
+      var bx = x + bw*0.18, bwid = bw*0.64;
+      var by = padT + plotH - bh;
+      svgParts.push('<rect x="'+bx.toFixed(1)+'" y="'+by.toFixed(1)+'" width="'+bwid.toFixed(1)+'" height="'+bh+'" rx="3" fill="'+color+'"/>');
+      if(v>0 && bh>14){
+        svgParts.push('<text x="'+(x+bw/2).toFixed(1)+'" y="'+(by-3).toFixed(1)+'" text-anchor="middle" fill="#6b7785" font-size="11">'+v+'</text>');
+      }
+      // x 标签：按 step 显示
+      var step = opts.labelStep || (n>14?3:1);
+      if(i % step === 0 || i===n-1){
+        svgParts.push('<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" fill="#9aa5b1" font-size="10">'+data[i].label+'</text>');
+      }
+    }
+    svg.innerHTML = svgParts.join("");
+  }
+
+  function renderCharts(){
+    var list = recordsInView();
+    renderSummary(list);
+    trendTitle.textContent = (currentView==="day"? "今日各小时次数" : (currentView==="week"? "近 7 天每日次数" : "近 30 天每日次数"));
+    var series = (currentView==="day")? buildHourSeries(list) : buildDaySeries();
+    barChart(trendChart, series, { color:"#0f9d58", labelStep:(currentView==="day"?3:1) });
+    barChart(hourChart, buildHourSeries(records), { color:"#2979ff", labelStep:3 });
+  }
+
+  function renderList(){
+    var list = records.slice().sort(function(a,b){ return b.ts-a.ts; });
+    listCount.textContent = "（共 "+records.length+" 条）";
+    recList.innerHTML="";
+    if(list.length===0){ recList.innerHTML='<p class="muted">还没有记录，碰一下贴片或点「手动记一次」。</p>'; return; }
+    var limit = 200;
+    list.slice(0,limit).forEach(function(r){
+      var div=document.createElement("div"); div.className="recItem";
+      var t=document.createElement("div"); t.className="t"; t.textContent=dtime(r.ts);
+      var who=document.createElement("div"); who.className="who";
+      who.innerHTML = '<div style="font-weight:600">'+escapeHtml(r.tagName)+'</div><div class="muted" style="font-size:11px">'+dts(r.ts)+'</div>';
+      var del=document.createElement("button"); del.className="del"; del.textContent="删除";
+      del.onclick=function(){ if(confirm("删除这条记录？")) deleteRecord(r.id); };
+      div.appendChild(t); div.appendChild(who); div.appendChild(del);
+      recList.appendChild(div);
+    });
+    if(list.length>limit){ var p=document.createElement("p"); p.className="muted"; p.style.textAlign="center"; p.textContent="仅显示最新 "+limit+" 条，导出可获取全部。"; recList.appendChild(p); }
+  }
+
+  function escapeHtml(s){ return (s==null?"":String(s)).replace(/[&<>"']/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+  function refreshAll(){ renderTags(); renderCharts(); renderList(); }
+
+  // ---------- 导出 ----------
+  function exportCSV(){
+    if(records.length===0){ toast("没有记录可导出", false); return; }
+    var head=["日期","时间","使用者","贴片ID","时间戳"];
+    var lines=[head.join(",")];
+    records.slice().sort(function(a,b){ return a.ts-b.ts; }).forEach(function(r){
+      lines.push([dts(r.ts), dtime(r.ts), csvCell(r.tagName), csvCell(r.tagId), r.ts].join(","));
+    });
+    download("poop_records_"+dts(Date.now().getTime())+".csv", lines.join("\r\n"), "text/csv;charset=utf-8");
+  }
+  function csvCell(s){ s=String(s==null?"":s); if(/[",\n]/.test(s)) s='"'+s.replace(/"/g,'""')+'"'; return s; }
+  function exportJSON(){
+    if(records.length===0){ toast("没有记录可导出", false); return; }
+    var out = {
+      exportedAt: new Date().toISOString(),
+      count: records.length,
+      tags: tags,
+      records: records.slice().sort(function(a,b){ return a.ts-b.ts; })
+    };
+    download("poop_records_"+dts(Date.now().getTime())+".json", JSON.stringify(out,null,2), "application/json");
+  }
+  function download(name, content, mime){
+    var blob = new Blob([content], {type:mime});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ try{ URL.revokeObjectURL(url); document.body.removeChild(a); }catch(e){} }, 200);
+    toast("已导出 "+name, false);
+  }
+
+  // ---------- Toast ----------
+  function toast(msg, withUndo, recId){
+    var box=$("toast");
+    var el=document.createElement("div"); el.className="toast";
+    var m=document.createElement("div"); m.className="msg";
+    if(withUndo){ m.innerHTML='<span class="ok">'+escapeHtml(msg)+'</span>'; } else { m.textContent=msg; }
+    el.appendChild(m);
+    if(withUndo && recId){
+      var u=document.createElement("button"); u.className="undo"; u.textContent="撤销";
+      u.onclick=function(){ deleteRecord(recId); if(box.contains(el)) box.removeChild(el); };
+      el.appendChild(u);
+      setTimeout(function(){ if(box.contains(el)) box.removeChild(el); }, 8000);
+    }
+    box.appendChild(el);
+    if(!withUndo){ setTimeout(function(){ if(box.contains(el)) box.removeChild(el); }, 3200); }
+  }
+
+  // ---------- 事件 ----------
+  scanBtn.onclick = function(){ startScan(); };
+  manualBtn.onclick = function(){
+    // 手动模式：若有多个贴片让用户选，否则用第一个/未命名
+    if(tags.length===0){ handleTap("manual"); return; }
+    if(tags.length===1){ handleTap(tags[0].id); return; }
+    var opts = tags.map(function(t,i){ return (i+1)+". "+t.name; }).join("\n");
+    var pick = prompt("选择使用者（输入序号）：\n"+opts, "1");
+    var idx = parseInt(pick,10)-1;
+    if(isNaN(idx) || idx<0 || idx>=tags.length){ toast("已取消", false); return; }
+    handleTap(tags[idx].id);
+  };
+  undoBtn.onclick = undoLast;
+  addTagBtn.onclick = addTag;
+  tagNameInput.onkeydown = function(e){ if(e.key==="Enter") addTag(); };
+  viewTabs.querySelectorAll("button").forEach(function(b){
+    b.onclick=function(){ currentView=b.getAttribute("data-v"); viewTabs.querySelectorAll("button").forEach(function(x){x.classList.remove("active");}); b.classList.add("active"); renderCharts(); };
+  });
+  csvBtn.onclick=exportCSV; jsonBtn.onclick=exportJSON;
+  clearBtn.onclick=function(){
+    if(records.length===0){ toast("没有记录", false); return; }
+    if(confirm("确定清空全部 "+records.length+" 条记录？此操作不可恢复。")){
+      if(confirm("再确认一次：彻底删除所有记录？")){
+        records=[]; lastRecordId=null; saveRecords(records); refreshAll(); toast("已清空全部记录", false);
+      }
+    }
+  };
+
+  // ---------- 初始化 ----------
+  renderEnvHint();
+  if(nfcSupported && secureCtx){ setStatus("NFC 可用，点开始监听","warn"); }
+  else { setStatus("NFC 不可用（手动模式）","off"); }
+  refreshAll();
+  undoBtn.disabled = true;
+  // 撤销按钮随记录变化可用态
+  var _refresh = refreshAll;
+  refreshAll = function(){ _refresh(); undoBtn.disabled = !lastRecordId; };
+  refreshAll();
+
+})();
+</script>
+</body>
+</html>
